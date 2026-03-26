@@ -1,6 +1,6 @@
 use reqwest;
-use scraper::{Html, Selector};
 
+#[derive(Debug, Clone)]
 pub struct NewsWebsite {
     url: String,
 }
@@ -18,9 +18,5 @@ impl NewsWebsite {
             .text()
             .await?;
         Ok(body)
-    }
-
-    pub async fn get_news_urls(&self, raw_html: &str) -> Vec<String> {
-        Vec::from([])       // TODO: change me
     }
 }
