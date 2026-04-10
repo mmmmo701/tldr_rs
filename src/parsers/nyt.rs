@@ -92,13 +92,13 @@ impl<'a> NytParser<'a> {
         let mut articles = Vec::new();
 
         println!("Found {} article URLs. Fetching and parsing articles...", urls.len());
-        let cnt: i32 = 0;
+        let mut cnt: i32 = 0;
 
-        for url in urls {
+        for url in &urls {
             cnt += 1;
             println!("Processing URL ({} of {}): {}", cnt, urls.len(), url);
             // if successfully obtained article_src html, then continue, else skip to next url
-            let article_src = match reqwest::get(&url).await {
+            let article_src = match reqwest::get(url).await {
                 Ok(response) => match response.text().await {
                     Ok(text) => text,
                     Err(_) => continue,
