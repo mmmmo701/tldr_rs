@@ -59,8 +59,7 @@ impl<'a> FoxParser<'a> {
     }
 
     /// Internal helper to fetch and parse a headline from a specific URL.
-    async fn parse_headline(&self, url: &str) -> Option<String> {
-        let article_src = reqwest::get(url).await.ok()?.text().await.ok()?;
+    async fn parse_headline(&self, article_src: &str) -> Option<String> {
         let document = Html::parse_document(&article_src);
 
         document.select(&FOX_HEADLINE_SELECTOR).next().map(|element| {
@@ -74,8 +73,7 @@ impl<'a> FoxParser<'a> {
     }
 
     /// Internal helper to fetch and parse the body content from a specific URL.
-    async fn parse_body(&self, url: &str) -> Option<String> {
-        let article_src = reqwest::get(url).await.ok()?.text().await.ok()?;
+    async fn parse_body(&self, article_src: &str) -> Option<String> {
         let document = Html::parse_document(&article_src);
 
         let body_texts: Vec<String> = document
@@ -96,17 +94,77 @@ impl<'a> FoxParser<'a> {
     pub async fn parse_top_articles(&self) -> Vec<(String, String)> {
         let urls = self.parse_news_urls();
         let mut articles = Vec::new();
+        let urls = urls.into_iter().take(30).collect::<Vec<_>>();
 
-        let urls = urls.into_iter().take(20).collect::<Vec<_>>();
+        println!("Found {} article URLs. Fetching and parsing articles...", urls.len());
+        let cnt: i32 = 0;
 
         for url in urls {
-            if let Some(headline) = self.parse_headline(&url).await {
-                if let Some(body) = self.parse_body(&url).await {
+            cnt += 1;
+            println!("Processing URL ({} of {}): {}", cnt, urls.len(), url);
+            // if successfully parsed url, then continue, else skip to next url
+            let article_src = match reqwest::get(&url).await {
+                Ok(response) => match response.text().await {
+                    Ok(text) => text,
+                    Err(_) => continue,
+                },
+                Err(_) => continue,
+            };
+
+            if let Some(headline) = self.parse_headline(&article_src).await {
+                if let Some(body) = self.parse_body(&article_src).await {
                     articles.push((headline, body));
                 }
             }
         }
 
         articles
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_parse_news_urls() {
+        let html = r#"
+            <article class="story-1">
+                <div class="m">
+                    <a href="https://www.foxnews.com/article1">Article 1</a>
+                </div>
+            </article>
+            <article class="story-2">
+                <div class="m">
+                    <a href="https://www.foxnews.com/article2">Article 2</a>
+                </div>
+            </article>
+        "#;
+        let parser = FoxParser::new(html);
+        let urls = parser.parse_news_urls();
+        assert_eq!(urls.len(), 2);
+        assert_eq!(urls[0], "https://www.foxnews.com/article1");
+        assert_eq!(urls[1], "https://www.foxnews.com/article2");
+    }
+
+    #[tokio::test]
+    async fn test_parse_headline_and_body() {
+        let test_article_html = r#"
+            <html>
+                <body>
+                    <div class="article-meta-upper">
+                        <h1 class="headline">Test Headline</h1>
+                    </div>
+                    <div class="article-body">
+                        <p>Paragraph 1.</p>
+                        <p>Paragraph 2.</p>
+                    </div>
+                </body>
+        "#;
+        let parser = FoxParser::new("");
+        let headline = parser.parse_headline(test_article_html).await;
+        let body = parser.parse_body(test_article_html).await;
+        assert_eq!(headline, Some("Test Headline".to_string()));
+        assert_eq!(body, Some("Paragraph 1.\n\nParagraph 2.".to_string()));
     }
 }

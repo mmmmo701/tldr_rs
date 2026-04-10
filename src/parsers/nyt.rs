@@ -56,9 +56,8 @@ impl<'a> NytParser<'a> {
     }
 
     /// Internal helper to fetch and parse a headline from a specific URL.
-    async fn parse_headline(&self, url: &str) -> Option<String> {
-        let article_src = reqwest::get(url).await.ok()?.text().await.ok()?;
-        let document = Html::parse_document(&article_src);
+    async fn parse_headline(&self, article_src: &str) -> Option<String> {
+        let document = Html::parse_document(article_src);
 
         document.select(&NYT_HEADLINE_SELECTOR).next().map(|element| {
             element
@@ -71,9 +70,8 @@ impl<'a> NytParser<'a> {
     }
 
     /// Internal helper to fetch and parse the body content from a specific URL.
-    async fn parse_body(&self, url: &str) -> Option<String> {
-        let article_src = reqwest::get(url).await.ok()?.text().await.ok()?;
-        let document = Html::parse_document(&article_src);
+    async fn parse_body(&self, article_src: &str) -> Option<String> {
+        let document = Html::parse_document(article_src);
 
         let body_texts: Vec<String> = document
             .select(&NYT_BODY_SELECTOR)
@@ -93,12 +91,63 @@ impl<'a> NytParser<'a> {
         let urls = self.parse_news_urls();
         let mut articles = Vec::new();
 
+        println!("Found {} article URLs. Fetching and parsing articles...", urls.len());
+        let cnt: i32 = 0;
+
         for url in urls {
-            if let (Some(headline), Some(body)) = (self.parse_headline(&url).await, self.parse_body(&url).await) {
+            cnt += 1;
+            println!("Processing URL ({} of {}): {}", cnt, urls.len(), url);
+            // if successfully obtained article_src html, then continue, else skip to next url
+            let article_src = match reqwest::get(&url).await {
+                Ok(response) => match response.text().await {
+                    Ok(text) => text,
+                    Err(_) => continue,
+                },
+                Err(_) => continue,
+            };
+
+            if let (Some(headline), Some(body)) = (self.parse_headline(article_src.as_str()).await, self.parse_body(article_src.as_str()).await) {
                 articles.push((headline, body));
             }
         }
 
         articles
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_parse_news_urls() {
+        let html = r#"
+            <a href="https://www.nytimes.com/2023/10/01/article1.html">Article 1</a>
+            <a href="https://www.nytimes.com/2023/10/01/article2.html">Article 2</a>
+        "#;
+        let parser = NytParser::new(html);
+        let urls = parser.parse_news_urls();
+        assert_eq!(urls.len(), 2);
+        assert_eq!(urls[0], "https://www.nytimes.com/2023/10/01/article1.html");
+        assert_eq!(urls[1], "https://www.nytimes.com/2023/10/01/article2.html");
+    }
+
+    #[tokio::test]
+    async fn test_parse_headline_and_body() {
+        let article_html = r#"
+            <html>
+                <body>
+                    <h1>Test Headline</h1>
+                    <p>Paragraph 1.</p>
+                    <p>Paragraph 2.</p>
+                </body>
+            </html>
+        "#;
+        let parser = NytParser::new("");
+        let headline = parser.parse_headline(article_html).await;
+        let body = parser.parse_body(article_html).await;
+
+        assert_eq!(headline, Some("Test Headline".to_string()));
+        assert_eq!(body, Some("Paragraph 1.\n\nParagraph 2.".to_string()));
     }
 }
