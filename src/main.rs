@@ -3,7 +3,6 @@ mod parsers;
 use news_websites::NewsWebsite;
 mod summarizers;
 use summarizers::news_summarizer::SummarizedNews;
-use ollama_rs::generation::completion::request::GenerationRequest;
 
 /// Main entry point of the application. It initializes the runtime, fetches news articles from both Fox News and New York Times, and prints their headlines and bodies to the console.
 async fn get_foxnews() -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
@@ -46,26 +45,22 @@ fn get_news(rt: &mut tokio::runtime::Runtime) -> Vec<(String, String)> {
 }
 
 /// The main function serves as the entry point of the application. It calls the `get_news` function to retrieve news articles from both sources and proceed with summarization.
+/// It initializes a `NewsList` with the fetched news articles, generates summaries and importance ratings for each article, and filters the news based on importance. Finally, it prints the headlines and summaries of the filtered news articles to the console.
+/// Note: The `main` function is asynchronous and uses the Tokio runtime to execute asynchronous tasks for fetching news and generating summaries.
 fn main() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     println!("Starting news summarization application. Fetching news articles...");
     let news = get_news(&mut rt);
+    println!("Fetched {} news articles. Proceeding to summarization...", news.len());
+    let summarized_news: Vec<SummarizedNews> = news.into_iter().map(SummarizedNews::new).collect();
+    let mut news_list = summarizers::news_filter::NewsList::new(summarized_news);
+    rt.block_on(news_list.summarize_all());
+    rt.block_on(news_list.rate_importance_all());
+    news_list.filter_by_importance(5);
 
-    println!("Summarizing {} news articles.", news.len());
-    let mut cnt: i32 = 0;
-    let summarized_news: Vec<SummarizedNews> = news.iter().map(|(headline, body)| {
-        let mut news_item = SummarizedNews::new((headline.clone(), body.clone()));
-        rt.block_on(news_item.summarize());
-        cnt += 1;
-        println!("Summarized news ({} of {}): {}", cnt, news.len(), news_item.get_summary());
-        news_item
-    }).collect();
-
-    for summarized_news in summarized_news {
-        println!("Headline: {}", summarized_news.get_headline());
-        println!("Summary: {}\n", summarized_news.get_summary());
-    }
+    println!("\nTop 5 news articles after summarization and importance filtering:");
+    news_list.print_news();
 }
 
 // At the bottom of src/main.rs
