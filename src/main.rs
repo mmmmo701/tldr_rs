@@ -7,29 +7,26 @@ use summarizers::news_summarizer::SummarizedNews;
 /// Main entry point of the application. It initializes the runtime, fetches news articles from both Fox News and New York Times, and prints their headlines and bodies to the console.
 async fn get_foxnews() -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
     let fox_web = NewsWebsite::from_url("https://foxnews.com");
-    let news_contents: Vec<(String, String)>;
-
-    match fox_web.fetch_raw_main_page().await {
+    let news_contents: Vec<(String, String)> = match fox_web.fetch_raw_main_page().await {
         Ok(html) => {
             let fp = parsers::fox::FoxParser::new(&html);
-            news_contents = fp.parse_top_articles().await;
-        },
-        Err(e) => return Err(e), 
-    }
+            fp.parse_top_articles().await
+        }
+        Err(e) => return Err(e),
+    };
     Ok(news_contents)
 }
 
 /// Fetches and parses news articles from the New York Times. It initializes a `NewsWebsite` instance for NYT, retrieves the raw HTML of the main page, and uses the `NytParser` to extract article headlines and bodies. The results are returned as a vector of tuples.
 async fn get_nytimes() -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
     let nyt_web = NewsWebsite::from_url("https://www.nytimes.com");
-    let news_contents: Vec<(String, String)>;
-    match nyt_web.fetch_raw_main_page().await {
+    let news_contents: Vec<(String, String)> = match nyt_web.fetch_raw_main_page().await {
         Ok(html) => {
             let np = parsers::nyt::NytParser::new(&html);
-            news_contents = np.parse_top_articles().await;
-        },
-        Err(e) => return Err(e), 
-    }
+            np.parse_top_articles().await
+        }
+        Err(e) => return Err(e),
+    };
     Ok(news_contents)
 }
 
@@ -40,8 +37,7 @@ fn get_news(rt: &mut tokio::runtime::Runtime) -> Vec<(String, String)> {
 
     println!("\nFetching NYT news articles...");
     let nyt_news_content = rt.block_on(get_nytimes()).unwrap();
-    let all_news_content = [fox_news_content, nyt_news_content].concat();
-    all_news_content
+    [fox_news_content, nyt_news_content].concat()
 }
 
 /// The main function serves as the entry point of the application. It calls the `get_news` function to retrieve news articles from both sources and proceed with summarization.
@@ -52,7 +48,10 @@ fn main() {
 
     println!("Starting news summarization application. Fetching news articles...");
     let news = get_news(&mut rt);
-    println!("Fetched {} news articles. Proceeding to summarization...", news.len());
+    println!(
+        "Fetched {} news articles. Proceeding to summarization...",
+        news.len()
+    );
     let summarized_news: Vec<SummarizedNews> = news.into_iter().map(SummarizedNews::new).collect();
     let mut news_list = summarizers::news_filter::NewsList::new(summarized_news);
     rt.block_on(news_list.summarize_all());

@@ -2,8 +2,8 @@
 //!
 //! This module defines the `SummarizedNews` struct, which encapsulates a news article's headline and body text, along with a method to generate a summary using the Ollama API. The `summarize` method constructs a prompt for the language model and updates the summary field with the generated summary or an error message if the summarization fails.
 
-use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::Ollama;
+use ollama_rs::generation::completion::request::GenerationRequest;
 
 /// A struct representing a news article with its headline, body, and summary.
 pub struct SummarizedNews {
@@ -28,7 +28,11 @@ impl SummarizedNews {
     /// # Arguments
     /// * `text` - A tuple containing the headline and body of the news article.
     pub fn new(text: (String, String)) -> Self {
-        Self { text, summary: "not summarized yet".to_string(), importance: 0 }
+        Self {
+            text,
+            summary: "not summarized yet".to_string(),
+            importance: 0,
+        }
     }
 
     /// Asynchronously generates a summary of the news article using the Ollama API.
@@ -36,17 +40,20 @@ impl SummarizedNews {
     pub async fn summarize(&mut self) {
         let (headline, body) = &self.text;
         let ollama = Ollama::default();
-        let prompt = format!("Summarize the following news article into 80-100 words:\n\nHeadline: {}\n\nBody: {}", headline, body);
-        
-        let res = ollama.generate(GenerationRequest::new("llama3.2:3b".to_string(), prompt)).await;
+        let prompt = format!(
+            "Summarize the following news article into 80-100 words:\n\nHeadline: {}\n\nBody: {}",
+            headline, body
+        );
+
+        let res = ollama
+            .generate(GenerationRequest::new("llama3.2:3b".to_string(), prompt))
+            .await;
 
         match res {
-            Ok(summary) => { 
-                self.summary = summary.response
-            },
-            Err(e) => { 
-                self.summary = format!("Error during summarization: {}", e); 
-            },
+            Ok(summary) => self.summary = summary.response,
+            Err(e) => {
+                self.summary = format!("Error during summarization: {}", e);
+            }
         };
     }
 
@@ -55,17 +62,22 @@ impl SummarizedNews {
     pub async fn get_importance_rating(&mut self) {
         let (headline, body) = &self.text;
         let ollama = Ollama::default();
-        let prompt = format!("Rate the importance of the following news article to the general public on a scale of 1 to 10, where 1 is least important and 10 is most important:\n\nHeadline: {}\n\nBody: {}", headline, body);
-        
-        let res = ollama.generate(GenerationRequest::new("llama3.2:3b".to_string(), prompt)).await;
+        let prompt = format!(
+            "Rate the importance of the following news article to the general public on a scale of 1 to 10, where 1 is least important and 10 is most important:\n\nHeadline: {}\n\nBody: {}",
+            headline, body
+        );
+
+        let res = ollama
+            .generate(GenerationRequest::new("llama3.2:3b".to_string(), prompt))
+            .await;
 
         match res {
-            Ok(rating) => { 
+            Ok(rating) => {
                 self.importance = rating.response.trim().parse::<i32>().unwrap_or(0);
-            },
-            Err(_) => { 
+            }
+            Err(_) => {
                 self.importance = 0; // Default to 0 if there's an error
-            },
+            }
         };
     }
 
@@ -87,6 +99,10 @@ impl SummarizedNews {
     /// Getter method for the importance rating of the news article.
     pub fn get_importance(&self) -> i32 {
         self.importance
+    }
+
+    pub fn set_importance(&mut self, importance: i32) {
+        self.importance = importance;
     }
 }
 

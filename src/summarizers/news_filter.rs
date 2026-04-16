@@ -44,7 +44,8 @@ impl NewsList {
     /// # Arguments
     /// * `max_num_news` - An unsigned integer specifying the maximum number of news articles to keep in the list after filtering based on importance.
     pub fn filter_by_importance(&mut self, max_num_news: usize) {
-        self.news.sort_by(|a, b| b.get_importance().cmp(&a.get_importance()));
+        self.news
+            .sort_by_key(|b| std::cmp::Reverse(b.get_importance()));
         self.news.truncate(max_num_news);
     }
 
@@ -82,23 +83,29 @@ mod tests {
     #[test]
     fn test_filter_by_importance() {
         let mut news_list = NewsList::new(vec![
-            SummarizedNews { text: ("Headline 1".to_string(), "Body 1".to_string()), summary: "Summary 1".to_string(), importance: 3 },
-            SummarizedNews { text: ("Headline 2".to_string(), "Body 2".to_string()), summary: "Summary 2".to_string(), importance: 7 },
-            SummarizedNews { text: ("Headline 3".to_string(), "Body 3".to_string()), summary: "Summary 3".to_string(), importance: 5 },
+            SummarizedNews::new(("Headline 1".to_string(), "Body 1".to_string())),
+            SummarizedNews::new(("Headline 2".to_string(), "Body 2".to_string())),
+            SummarizedNews::new(("Headline 3".to_string(), "Body 3".to_string())),
         ]);
+        news_list.news[0].set_importance(3);
+        news_list.news[1].set_importance(7);
+        news_list.news[2].set_importance(5);
         news_list.filter_by_importance(2);
         assert_eq!(news_list.news.len(), 2);
-        assert_eq!(news_list.news[0].importance, 7);
-        assert_eq!(news_list.news[1].importance, 5);
+        assert_eq!(news_list.news[0].get_importance(), 7);
+        assert_eq!(news_list.news[1].get_importance(), 5);
     }
 
     #[test]
     fn test_filter_by_importance_with_zero_max() {
         let mut news_list = NewsList::new(vec![
-            SummarizedNews { text: ("Headline 1".to_string(), "Body 1".to_string()), summary: "Summary 1".to_string(), importance: 3 },
-            SummarizedNews { text: ("Headline 2".to_string(), "Body 2".to_string()), summary: "Summary 2".to_string(), importance: 7 },
-            SummarizedNews { text: ("Headline 3".to_string(), "Body 3".to_string()), summary: "Summary 3".to_string(), importance: 5 },
+            SummarizedNews::new(("Headline 1".to_string(), "Body 1".to_string())),
+            SummarizedNews::new(("Headline 2".to_string(), "Body 2".to_string())),
+            SummarizedNews::new(("Headline 3".to_string(), "Body 3".to_string())),
         ]);
+        news_list.news[0].set_importance(3);
+        news_list.news[1].set_importance(7);
+        news_list.news[2].set_importance(5);
         news_list.filter_by_importance(0);
         assert_eq!(news_list.news.len(), 0);
     }

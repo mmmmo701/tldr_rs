@@ -1,2 +1,2 @@
-pub mod fox; 
+pub mod fox;
 pub mod nyt;

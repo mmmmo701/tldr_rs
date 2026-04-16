@@ -5,20 +5,17 @@
 //!
 //! It utilizes `reqwest` for networking and `scraper` for HTML parsing.
 
-
+use chrono::Utc;
 use scraper::{Html, Selector};
 use std::sync::LazyLock;
-use chrono::Utc;
 
 /// Global CSS selector for NYT article headlines. It targets the only `h1` element on the page, which is typically the headline.
-static NYT_HEADLINE_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("h1").expect("Static Headline CSS selector is malformed")
-});
+static NYT_HEADLINE_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("h1").expect("Static Headline CSS selector is malformed"));
 
 /// Global CSS selector for NYT article body paragraphs. It targets all `p` elements, which are commonly used for article content.
-static NYT_BODY_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("p").expect("Static Body CSS selector is malformed")
-});
+static NYT_BODY_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("p").expect("Static Body CSS selector is malformed"));
 
 /// A parser responsible for extracting news data from New York Times HTML source code.
 pub struct NytParser<'a> {
@@ -59,14 +56,17 @@ impl<'a> NytParser<'a> {
     async fn parse_headline(&self, article_src: &str) -> Option<String> {
         let document = Html::parse_document(article_src);
 
-        document.select(&NYT_HEADLINE_SELECTOR).next().map(|element| {
-            element
-                .text()
-                .collect::<Vec<_>>()
-                .concat()
-                .trim()
-                .to_string()
-        })
+        document
+            .select(&NYT_HEADLINE_SELECTOR)
+            .next()
+            .map(|element| {
+                element
+                    .text()
+                    .collect::<Vec<_>>()
+                    .concat()
+                    .trim()
+                    .to_string()
+            })
     }
 
     /// Internal helper to fetch and parse the body content from a specific URL.
@@ -75,7 +75,14 @@ impl<'a> NytParser<'a> {
 
         let body_texts: Vec<String> = document
             .select(&NYT_BODY_SELECTOR)
-            .map(|element| element.text().collect::<Vec<_>>().concat().trim().to_string())
+            .map(|element| {
+                element
+                    .text()
+                    .collect::<Vec<_>>()
+                    .concat()
+                    .trim()
+                    .to_string()
+            })
             .collect();
 
         if body_texts.is_empty() {
@@ -91,7 +98,10 @@ impl<'a> NytParser<'a> {
         let urls = self.parse_news_urls();
         let mut articles = Vec::new();
 
-        println!("Found {} article URLs. Fetching and parsing articles...", urls.len());
+        println!(
+            "Found {} article URLs. Fetching and parsing articles...",
+            urls.len()
+        );
         let mut cnt: i32 = 0;
 
         for url in &urls {
@@ -106,7 +116,10 @@ impl<'a> NytParser<'a> {
                 Err(_) => continue,
             };
 
-            if let (Some(headline), Some(body)) = (self.parse_headline(article_src.as_str()).await, self.parse_body(article_src.as_str()).await) {
+            if let (Some(headline), Some(body)) = (
+                self.parse_headline(article_src.as_str()).await,
+                self.parse_body(article_src.as_str()).await,
+            ) {
                 articles.push((headline, body));
             }
         }
@@ -121,15 +134,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_news_urls() {
-        let html = r#"
-            <a href="https://www.nytimes.com/2023/10/01/article1.html">Article 1</a>
-            <a href="https://www.nytimes.com/2023/10/01/article2.html">Article 2</a>
-        "#;
-        let parser = NytParser::new(html);
+        let today = Utc::now().format("%Y/%m/%d").to_string();
+        let html = format!(
+            r#"
+            <a href="https://www.nytimes.com/{}/article1.html">Article 1</a>
+            <a href="https://www.nytimes.com/{}/article2.html">Article 2</a>
+        "#,
+            today, today
+        );
+        let parser = NytParser::new(&html);
         let urls = parser.parse_news_urls();
         assert_eq!(urls.len(), 2);
-        assert_eq!(urls[0], "https://www.nytimes.com/2023/10/01/article1.html");
-        assert_eq!(urls[1], "https://www.nytimes.com/2023/10/01/article2.html");
+        assert_eq!(
+            urls[0],
+            format!("https://www.nytimes.com/{}/article1.html", today)
+        );
+        assert_eq!(
+            urls[1],
+            format!("https://www.nytimes.com/{}/article2.html", today)
+        );
     }
 
     #[tokio::test]

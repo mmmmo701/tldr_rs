@@ -17,8 +17,7 @@ static FOX_HEADLINE_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
 
 /// Global CSS selector for Fox article body paragraphs.
 static FOX_BODY_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
-    Selector::parse("div.article-body p")
-        .expect("Static Body CSS selector is malformed")
+    Selector::parse("div.article-body p").expect("Static Body CSS selector is malformed")
 });
 
 /// A parser responsible for extracting news data from Fox News HTML source code.
@@ -41,7 +40,7 @@ impl<'a> FoxParser<'a> {
 
     /// Parses the initial HTML source to find all article links.
     ///
-    /// This looks for `article` elements with a class containing 'story-' 
+    /// This looks for `article` elements with a class containing 'story-'
     /// and extracts the `href` attribute from the nested anchor tag.
     pub fn parse_news_urls(&self) -> Vec<String> {
         let mut urls = Vec::new();
@@ -60,25 +59,35 @@ impl<'a> FoxParser<'a> {
 
     /// Internal helper to fetch and parse a headline from a specific URL.
     async fn parse_headline(&self, article_src: &str) -> Option<String> {
-        let document = Html::parse_document(&article_src);
+        let document = Html::parse_document(article_src);
 
-        document.select(&FOX_HEADLINE_SELECTOR).next().map(|element| {
-            element
-                .text()
-                .collect::<Vec<_>>()
-                .concat()
-                .trim()
-                .to_string()
-        })
+        document
+            .select(&FOX_HEADLINE_SELECTOR)
+            .next()
+            .map(|element| {
+                element
+                    .text()
+                    .collect::<Vec<_>>()
+                    .concat()
+                    .trim()
+                    .to_string()
+            })
     }
 
     /// Internal helper to fetch and parse the body content from a specific URL.
     async fn parse_body(&self, article_src: &str) -> Option<String> {
-        let document = Html::parse_document(&article_src);
+        let document = Html::parse_document(article_src);
 
         let body_texts: Vec<String> = document
             .select(&FOX_BODY_SELECTOR)
-            .map(|element| element.text().collect::<Vec<_>>().concat().trim().to_string())
+            .map(|element| {
+                element
+                    .text()
+                    .collect::<Vec<_>>()
+                    .concat()
+                    .trim()
+                    .to_string()
+            })
             .collect();
 
         if body_texts.is_empty() {
@@ -96,7 +105,10 @@ impl<'a> FoxParser<'a> {
         let mut articles = Vec::new();
         let urls = urls.into_iter().take(30).collect::<Vec<_>>();
 
-        println!("Found {} article URLs. Fetching and parsing articles...", urls.len());
+        println!(
+            "Found {} article URLs. Fetching and parsing articles...",
+            urls.len()
+        );
         let mut cnt: i32 = 0;
 
         for url in &urls {
@@ -111,10 +123,11 @@ impl<'a> FoxParser<'a> {
                 Err(_) => continue,
             };
 
-            if let Some(headline) = self.parse_headline(&article_src).await {
-                if let Some(body) = self.parse_body(&article_src).await {
-                    articles.push((headline, body));
-                }
+            if let (Some(headline), Some(body)) = (
+                self.parse_headline(&article_src).await,
+                self.parse_body(&article_src).await,
+            ) {
+                articles.push((headline, body));
             }
         }
 
